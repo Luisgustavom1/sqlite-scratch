@@ -70,12 +70,28 @@ describe 'database' do
     long_email = "a"*256
     script = [
        "insert 1 #{long_username} #{long_email}",
+       "select",
        ".exit",
     ]
     result = run_script(script)
     expect(result).to match_array([
       "db > ",
       "db > string is too long",
+      "db > executed",
+    ])
+  end
+  
+  it 'prints an error message if id is negative' do    
+    script = [
+      "insert -1 username foo@bar.com",
+      "select",
+      ".exit",
+    ]
+    result = run_script(script)
+    expect(result).to match_array([
+      "db > ",
+      "db > ID must be positive",
+      "db > executed",
     ])
   end
 end

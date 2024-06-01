@@ -41,6 +41,7 @@ typedef enum {
 	PREPARE_SUCCESS,
 	PREPARE_SYNTAX_ERROR,
 	PREPARE_UNRECOGNIZED_STATEMENT,
+	PREPARE_NEGATIVE_ID,
 	PREPARE_STRING_TOO_LONG
 } PrepareResult;
 
@@ -133,6 +134,34 @@ MetaCommandResult do_meta_command(InputBuffer *ib, Table *table) {
 	return META_COMMAND_UNRECOGNIZED_COMMAND;
 }
 
+PrepareResult prepare_insert(InputBuffer *ib, Statement *statement) {
+	statement->type = STATEMENT_INSERT;
+
+	char *insert_keyword = strtok(ib->buffer, " ");
+	char *id_str = strtok(NULL, " ");
+	char *username = strtok(NULL, " ");
+	char *email = strtok(NULL, " ");
+
+	if (id_str == NULL || username == NULL || email == NULL) {
+		return PREPARE_SYNTAX_ERROR;
+	}
+
+	if (strlen(username) > COLUMN_USERNAME_SIZE || strlen(email) > COLUMN_EMAIL_SIZE) {
+		return PREPARE_STRING_TOO_LONG;
+	}
+
+	int id = atoi(id_str);
+	if (id < 0) {
+		return PREPARE_NEGATIVE_ID;
+	}
+
+	statement->row_to_insert.id = id;
+	strcpy(statement->row_to_insert.username, username);
+	strcpy(statement->row_to_insert.email, email);
+
+	return PREPARE_SUCCESS;
+}
+
 PrepareResult prepare_statement(InputBuffer *ib, Statement *statement) {
 	if (strcmp(ib->buffer, "select") == 0) {
 		statement->type = STATEMENT_SELECT;
@@ -140,27 +169,7 @@ PrepareResult prepare_statement(InputBuffer *ib, Statement *statement) {
 	}
 
 	if (strncmp(ib->buffer, "insert", 6) == 0) {
-		statement->type = STATEMENT_INSERT;
-
-		char *insert_keyword = strtok(ib->buffer, " ");
-		char *id_str = strtok(NULL, " ");
-		char *username = strtok(NULL, " ");
-		char *email = strtok(NULL, " ");
-
-		if (id_str == NULL || username == NULL || email == NULL) {
-			return PREPARE_SYNTAX_ERROR;
-		}
-
-		if (strlen(username) > COLUMN_USERNAME_SIZE || strlen(email) > COLUMN_EMAIL_SIZE) {
-			return PREPARE_STRING_TOO_LONG;
-		}
-
-		int id = atoi(id_str);
-		statement->row_to_insert.id = id;
-		strcpy(statement->row_to_insert.username, username);
-		strcpy(statement->row_to_insert.email, email);
-
-		return PREPARE_SUCCESS;
+		return prepare_insert(ib, statement);
 	}
 
 	return PREPARE_UNRECOGNIZED_STATEMENT;
@@ -241,6 +250,9 @@ int main(int argc, char *argv[]) {
 				break;
 			case (PREPARE_STRING_TOO_LONG):
 				printf("string is too long\n");
+				continue;
+			case (PREPARE_NEGATIVE_ID):
+				printf("ID must be positive\n");
 				continue;
 			case (PREPARE_SYNTAX_ERROR):
 				printf("Syntax error. Could not parse statement.\n");
