@@ -10,8 +10,8 @@
 #define COLUMN_EMAIL_SIZE 255
 typedef struct {
 	uint32_t id;
-	char username[COLUMN_USERNAME_SIZE];
-	char email[COLUMN_EMAIL_SIZE];
+	char username[COLUMN_USERNAME_SIZE + 1];
+	char email[COLUMN_EMAIL_SIZE + 1];
 } Row;
 
 const uint32_t ID_SIZE = size_of_attribute(Row, id);
@@ -40,7 +40,8 @@ typedef enum {
 typedef enum {
 	PREPARE_SUCCESS,
 	PREPARE_SYNTAX_ERROR,
-	PREPARE_UNRECOGNIZED_STATEMENT
+	PREPARE_UNRECOGNIZED_STATEMENT,
+	PREPARE_STRING_TOO_LONG
 } PrepareResult;
 
 typedef enum {
@@ -48,9 +49,9 @@ typedef enum {
 	STATEMENT_SELECT
 } StatementType;
 
-typedef enum { 
-	EXECUTE_SUCCESS, 
-	EXECUTE_TABLE_FULL 
+typedef enum {
+	EXECUTE_SUCCESS,
+	EXECUTE_TABLE_FULL
 } ExecuteResult;
 
 typedef struct {
@@ -73,7 +74,7 @@ InputBuffer* new_input_buffer() {
   	return input_buffer;
 }
 
-void close_input_buffer(InputBuffer* ib) { 
+void close_input_buffer(InputBuffer* ib) {
 	free(ib->buffer);
 	free(ib);
 }
@@ -111,7 +112,7 @@ void print_prompt() {
 
 void read_input(InputBuffer *input_buffer) {
 	ssize_t bytes_read = getline(&(input_buffer->buffer), &(input_buffer->buffer_length), stdin);
-	
+
 	if (bytes_read <= 0) {
 		printf("Error reading input\n");
 		exit(EXIT_FAILURE);
@@ -140,17 +141,24 @@ PrepareResult prepare_statement(InputBuffer *ib, Statement *statement) {
 
 	if (strncmp(ib->buffer, "insert", 6) == 0) {
 		statement->type = STATEMENT_INSERT;
-		int args = sscanf(
-			ib->buffer,
-			"insert %d %s %s",
-			&(statement->row_to_insert.id),
-			statement->row_to_insert.username,
-			statement->row_to_insert.email
-		);
 
-		if (args < 3) {
+		char *insert_keyword = strtok(ib->buffer, " ");
+		char *id_str = strtok(NULL, " ");
+		char *username = strtok(NULL, " ");
+		char *email = strtok(NULL, " ");
+
+		if (id_str == NULL || username == NULL || email == NULL) {
 			return PREPARE_SYNTAX_ERROR;
 		}
+
+		if (strlen(username) > COLUMN_USERNAME_SIZE || strlen(email) > COLUMN_EMAIL_SIZE) {
+			return PREPARE_STRING_TOO_LONG;
+		}
+
+		int id = atoi(id_str);
+		statement->row_to_insert.id = id;
+		strcpy(statement->row_to_insert.username, username);
+		strcpy(statement->row_to_insert.email, email);
 
 		return PREPARE_SUCCESS;
 	}
@@ -162,21 +170,21 @@ ExecuteResult execute_insert(Statement *st, Table *table) {
 	if (table->num_rows >= TABLE_MAX_ROWS) {
 		return EXECUTE_TABLE_FULL;
 	}
-	
+
 	Row *r = &(st->row_to_insert);
 	serialize_row(r, row_slot(table, table->num_rows));
 	table->num_rows++;
-	
+
 	return EXECUTE_SUCCESS;
 }
 
 ExecuteResult execute_select(Statement *st, Table *table) {
 	Row r;
-	
+
 	for (uint32_t i = 0; i < table->num_rows; i++) {
 		deserialize_row(row_slot(table, i), &r);
-		print_row(r);		
-	} 	
+		print_row(r);
+	}
 
 	return EXECUTE_SUCCESS;
 }
@@ -211,11 +219,11 @@ void free_table(Table *table) {
 int main(int argc, char *argv[]) {
 	InputBuffer* input_buffer = new_input_buffer();
 	Table* table = new_table();
-	
+
 	while(true) {
 		print_prompt();
 		read_input(input_buffer);
-	
+
 		// Non-Sql statements 'meta-commands'
 		if (input_buffer->buffer[0] == '.') {
 			switch (do_meta_command(input_buffer, table)) {
@@ -231,6 +239,9 @@ int main(int argc, char *argv[]) {
 		switch (prepare_statement(input_buffer, &statement)) {
 			case (PREPARE_SUCCESS):
 				break;
+			case (PREPARE_STRING_TOO_LONG):
+				printf("string is too long\n");
+				continue;
 			case (PREPARE_SYNTAX_ERROR):
 				printf("Syntax error. Could not parse statement.\n");
 				continue;
@@ -241,12 +252,13 @@ int main(int argc, char *argv[]) {
 
 		switch (execute_statement(&statement, table)) {
 			case (EXECUTE_SUCCESS):
-				printf("excuted\n");
-				break;	
+				printf("executed\n");
+				break;
 			case (EXECUTE_TABLE_FULL):
 				printf("Error: table is full\n");
 				break;
 		}
 	}
 }
+
 
