@@ -2,6 +2,35 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
+
+#define size_of_attribute(Struct, Attribute) sizeof(((Struct*)0)->Attribute)
+
+#define COLUMN_USERNAME_SIZE 32
+#define COLUMN_EMAIL_SIZE 255
+typedef struct {
+	uint32_t id;
+	char username[COLUMN_USERNAME_SIZE];
+	char email[COLUMN_EMAIL_SIZE];
+} Row;
+
+const uint32_t ID_SIZE = size_of_attribute(Row, id);
+const uint32_t USERNAME_SIZE = size_of_attribute(Row, username);
+const uint32_t EMAIL_SIZE = size_of_attribute(Row, email);
+const uint32_t ID_OFFSET = 0;
+const uint32_t USERNAME_OFFSET = ID_OFFSET + ID_SIZE;
+const uint32_t EMAIL_OFFSET = USERNAME_OFFSET + EMAIL_SIZE;
+const uint32_t ROW_SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
+
+const uint32_t TABLE_MAX_PAGE = 100;
+const uint32_t PAGE_SIZE = 4096;
+const uint32_t ROWS_PER_PAGE = PAGE_SIZE/ROW_SIZE;
+const uint32_t TABLE_MAX_ROWS = ROWS_PER_PAGE * TABLE_MAX_PAGE;
+
+typedef struct {
+	uint32_t num_rows;
+	void* pages[TABLE_MAX_PAGE];
+} Table;
 
 typedef enum {
 	META_COMMAND_SUCCESS,
@@ -10,6 +39,7 @@ typedef enum {
 
 typedef enum {
 	PREPARE_SUCCESS,
+	PREPARE_SYNTAX_ERROR,
 	PREPARE_UNRECOGNIZED_STATEMENT
 } PrepareResult;
 
@@ -18,8 +48,14 @@ typedef enum {
 	STATEMENT_SELECT
 } StatementType;
 
+typedef enum { 
+	EXECUTE_SUCCESS, 
+	EXECUTE_TABLE_FULL 
+} ExecuteResult;
+
 typedef struct {
 	StatementType type;
+	Row row_to_insert;
 } Statement;
 
 typedef struct {
@@ -42,6 +78,33 @@ void close_input_buffer(InputBuffer* ib) {
 	free(ib);
 }
 
+void serialize_row(Row *r, void* dest) {
+	memcpy(dest + ID_OFFSET, &(r->id), ID_SIZE);
+	memcpy(dest + USERNAME_OFFSET, &(r->username), USERNAME_SIZE);
+	memcpy(dest + EMAIL_OFFSET, &(r->email), EMAIL_SIZE);
+}
+
+void deserialize_row(void *source, Row *r) {
+	memcpy(&(r->id), source + ID_OFFSET, ID_SIZE);
+	memcpy(&(r->username), source + USERNAME_OFFSET, USERNAME_SIZE);
+	memcpy(&(r->email), source + EMAIL_OFFSET, EMAIL_SIZE);
+}
+
+void* row_slot(Table* table, uint32_t row_num) {
+	uint32_t page_num = row_num / TABLE_MAX_ROWS;
+	void* page = table->pages[page_num];
+	if (page == NULL) {
+		page = table->pages[page_num] = malloc(PAGE_SIZE);
+	}
+	uint32_t row_offset = row_num % ROWS_PER_PAGE;
+	uint32_t byte_offset = row_offset * ROW_SIZE;
+	return page + byte_offset;
+}
+
+void print_row(Row *r) {
+	printf("(%d, %s, %s)\n", r->id, r->username, r->email);
+}
+
 void print_prompt() {
 	printf("db > ");
 }
@@ -58,9 +121,10 @@ void read_input(InputBuffer *input_buffer) {
 	input_buffer->buffer[bytes_read - 1] = 0;
 }
 
-MetaCommandResult do_meta_command(InputBuffer* ib) {
+MetaCommandResult do_meta_command(InputBuffer *ib, Table *table) {
 	if (strcmp(ib->buffer, ".exit") == 0) {
 		close_input_buffer(ib);
+		free(table);
 		exit(EXIT_SUCCESS);
 		return META_COMMAND_SUCCESS;
 	}
@@ -69,40 +133,91 @@ MetaCommandResult do_meta_command(InputBuffer* ib) {
 }
 
 PrepareResult prepare_statement(InputBuffer *ib, Statement *statement) {
-	if (strncmp(ib->buffer, "select", 6) == 0) {
+	if (strcmp(ib->buffer, "select") == 0) {
 		statement->type = STATEMENT_SELECT;
 		return PREPARE_SUCCESS;
 	}
 
 	if (strncmp(ib->buffer, "insert", 6) == 0) {
 		statement->type = STATEMENT_INSERT;
+		int args = sscanf(
+			ib->buffer,
+			"insert %d %s %s",
+			&(statement->row_to_insert.id),
+			statement->row_to_insert.username,
+			statement->row_to_insert.email
+		);
+
+		if (args < 3) {
+			return PREPARE_SYNTAX_ERROR;
+		}
+
 		return PREPARE_SUCCESS;
 	}
 
 	return PREPARE_UNRECOGNIZED_STATEMENT;
 }
 
-void execute_statement(Statement *st) {
+ExecuteResult execute_insert(Statement *st, Table *table) {
+	if (table->num_rows >= TABLE_MAX_ROWS) {
+		return EXECUTE_TABLE_FULL;
+	}
+	
+	serialize_row(&(st->row_to_insert), row_slot(table, table->num_rows));
+	table->num_rows++;
+
+	return EXECUTE_SUCCESS;
+}
+
+ExecuteResult execute_select(Statement *st, Table *table) {
+	Row* r;
+	
+	for (uint32_t i = 0; i < table->num_rows; i++) {
+		deserialize_row(row_slot(table, i), r);
+		print_row(r);		
+	} 	
+
+	return EXECUTE_SUCCESS;
+}
+
+ExecuteResult execute_statement(Statement *st, Table *table) {
 	switch(st->type) {
 		case (STATEMENT_SELECT):
-			printf("select statement");
-			break;
+			return execute_select(st, table);
 		case (STATEMENT_INSERT):
-			printf("insert statement");
-			break;
+			return execute_insert(st, table);
 	}
+}
+
+Table* new_table() {
+	Table* table = (Table*)malloc(sizeof(Table));
+	table->num_rows = 0;
+
+	for (int i = 0; i < TABLE_MAX_PAGE; i++) {
+		table->pages[i] = NULL;
+	}
+
+	return table;
+}
+
+void free_table(Table *table) {
+	for (int i = 0; i < table->num_rows; i++) {
+		free(table->pages[i]);
+	}
+	free(table);
 }
 
 int main(int argc, char *argv[]) {
 	InputBuffer* input_buffer = new_input_buffer();
-
+	Table* table = new_table();
+	
 	while(true) {
 		print_prompt();
 		read_input(input_buffer);
 	
 		// Non-Sql statements 'meta-commands'
 		if (input_buffer->buffer[0] == '.') {
-			switch (do_meta_command(input_buffer)) {
+			switch (do_meta_command(input_buffer, table)) {
 				case (META_COMMAND_SUCCESS):
 					continue;
 				case (META_COMMAND_UNRECOGNIZED_COMMAND):
@@ -115,13 +230,22 @@ int main(int argc, char *argv[]) {
 		switch (prepare_statement(input_buffer, &statement)) {
 			case (PREPARE_SUCCESS):
 				break;
+			case (PREPARE_SYNTAX_ERROR):
+				printf("Syntax error. Could not parse statement.\n");
+				continue;
 			case (PREPARE_UNRECOGNIZED_STATEMENT):
 				printf("Unrecognized keyword at start of '%s'.\n", input_buffer->buffer);
 				continue;
 		}
 
-		execute_statement(&statement);
-		printf("Executed.\n");
+		switch (execute_statement(&statement, table)) {
+			case (EXECUTE_SUCCESS):
+				printf("excuted\n");
+				break;	
+			case (EXECUTE_TABLE_FULL):
+				printf("Error: table is full\n");
+				break;
+		}
 	}
 }
 
