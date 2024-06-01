@@ -24,7 +24,7 @@ const uint32_t ROW_SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
 
 const uint32_t TABLE_MAX_PAGE = 100;
 const uint32_t PAGE_SIZE = 4096;
-const uint32_t ROWS_PER_PAGE = PAGE_SIZE/ROW_SIZE;
+const uint32_t ROWS_PER_PAGE = PAGE_SIZE / ROW_SIZE;
 const uint32_t TABLE_MAX_ROWS = ROWS_PER_PAGE * TABLE_MAX_PAGE;
 
 typedef struct {
@@ -91,18 +91,18 @@ void deserialize_row(void *source, Row *r) {
 }
 
 void* row_slot(Table* table, uint32_t row_num) {
-	uint32_t page_num = row_num / TABLE_MAX_ROWS;
+	uint32_t page_num = row_num / ROWS_PER_PAGE;
 	void* page = table->pages[page_num];
 	if (page == NULL) {
 		page = table->pages[page_num] = malloc(PAGE_SIZE);
 	}
-	uint32_t row_offset = row_num % ROWS_PER_PAGE;
-	uint32_t byte_offset = row_offset * ROW_SIZE;
+	uint32_t row_num_in_page = row_num % ROWS_PER_PAGE;
+	uint32_t byte_offset = row_num_in_page * ROW_SIZE;
 	return page + byte_offset;
 }
 
-void print_row(Row *r) {
-	printf("(%d, %s, %s)\n", r->id, r->username, r->email);
+void print_row(Row r) {
+	printf("(%d, %s, %s)\n", r.id, r.username, r.email);
 }
 
 void print_prompt() {
@@ -163,17 +163,18 @@ ExecuteResult execute_insert(Statement *st, Table *table) {
 		return EXECUTE_TABLE_FULL;
 	}
 	
-	serialize_row(&(st->row_to_insert), row_slot(table, table->num_rows));
+	Row *r = &(st->row_to_insert);
+	serialize_row(r, row_slot(table, table->num_rows));
 	table->num_rows++;
-
+	
 	return EXECUTE_SUCCESS;
 }
 
 ExecuteResult execute_select(Statement *st, Table *table) {
-	Row* r;
+	Row r;
 	
 	for (uint32_t i = 0; i < table->num_rows; i++) {
-		deserialize_row(row_slot(table, i), r);
+		deserialize_row(row_slot(table, i), &r);
 		print_row(r);		
 	} 	
 
