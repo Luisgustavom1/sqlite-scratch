@@ -3,6 +3,10 @@ describe 'database' do
     `rm -rf ./tests/test.db`
   end
 
+  after(:all) do 
+    `rm -rf ./tests/test.db`
+  end
+
   def run_script(commands)
     output = nil
     IO.popen("./sqlite ./tests/test.db", "r+") do |pipe|

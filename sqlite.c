@@ -91,8 +91,8 @@ void close_input_buffer(InputBuffer* ib) {
 
 void serialize_row(Row *r, void* dest) {
 	memcpy(dest + ID_OFFSET, &(r->id), ID_SIZE);
-	memcpy(dest + USERNAME_OFFSET, &(r->username), USERNAME_SIZE);
-	memcpy(dest + EMAIL_OFFSET, &(r->email), EMAIL_SIZE);
+	strncpy(dest + USERNAME_OFFSET, r->username, USERNAME_SIZE);
+	strncpy(dest + EMAIL_OFFSET, r->email, EMAIL_SIZE);
 }
 
 void deserialize_row(void *source, Row *r) {
