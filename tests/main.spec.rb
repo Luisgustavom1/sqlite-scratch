@@ -1,7 +1,11 @@
 describe 'database' do
+  before do
+    `rm -rf ./tests/test.db`
+  end
+
   def run_script(commands)
     output = nil
-    IO.popen("./sqlite", "r+") do |pipe|
+    IO.popen("./sqlite ./tests/test.db", "r+") do |pipe|
       commands.each do |command|
         pipe.puts command
       end
@@ -92,6 +96,28 @@ describe 'database' do
       "db > ",
       "db > ID must be positive",
       "db > executed",
+    ])
+  end
+
+  
+  it 'inserts and retrieves a row after closing connection' do
+    result = run_script([
+      "insert 1 user_1 user_1@example.com",
+      ".exit",
+    ])
+    expect(result).to match_array([
+      "db > ", 
+      "db > executed", 
+    ])
+    
+    result2 = run_script([
+      "select",
+      ".exit",
+    ])
+    expect(result2).to match_array([
+      "db > ",
+      "db > (1, user_1, user_1@example.com)",
+      "executed",
     ])
   end
 end
