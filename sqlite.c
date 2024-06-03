@@ -41,6 +41,12 @@ typedef struct {
 	Pager* pager;
 } Table;
 
+typedef struct {
+	Table* table;
+	uint32_t row_num;
+	bool end_of_table;
+} Cursor;
+
 typedef enum {
 	META_COMMAND_SUCCESS,
 	META_COMMAND_UNRECOGNIZED_COMMAND
@@ -74,6 +80,29 @@ typedef struct {
   size_t buffer_length;
   ssize_t input_length;
 } InputBuffer;
+
+Cursor* cursor_table_start(Table* table) {
+	Cursor* cursor = malloc(sizeof(Table));
+	cursor->table = table;
+	cursor->row_num = 0;
+	cursor->end_of_table = (table->num_rows == 0);
+	
+	return cursor;
+}
+
+Cursor* cursor_table_end(Table* table) {
+	Cursor* cursor = malloc(sizeof(Table));
+	cursor->table = table;
+	cursor->row_num = table->num_rows;
+	cursor->end_of_table = true;
+	
+	return cursor;
+}
+
+void advance_cursor(Cursor* cursor) {
+	cursor->row_num++;
+	cursor->end_of_table = (cursor->row_num >= cursor->table->num_rows);
+}
 
 InputBuffer* new_input_buffer() {
 	InputBuffer* input_buffer = (InputBuffer*)malloc(sizeof(InputBuffer));
@@ -175,9 +204,10 @@ void pager_flush(Pager* pager, uint32_t page_num, uint32_t size) {
 	}
 }
 
-void* row_slot(Table* table, uint32_t row_num) {
+void* row_slot(Cursor* cursor) {
+	uint32_t row_num = cursor->row_num;
 	uint32_t page_num = row_num / ROWS_PER_PAGE;
-	void* page = get_page(table->pager, page_num);
+	void* page = get_page(cursor->table->pager, page_num);
 	uint32_t row_num_in_page = row_num % ROWS_PER_PAGE;
 	uint32_t byte_offset = row_num_in_page * ROW_SIZE;
 	return page + byte_offset;
@@ -305,21 +335,29 @@ ExecuteResult execute_insert(Statement *st, Table *table) {
 	if (table->num_rows >= TABLE_MAX_ROWS) {
 		return EXECUTE_TABLE_FULL;
 	}
+	
+	Cursor* cursor = cursor_table_end(table);
 
 	Row *r = &(st->row_to_insert);
-	serialize_row(r, row_slot(table, table->num_rows));
+	serialize_row(r, row_slot(cursor));
 	table->num_rows++;
 
-	return EXECUTE_SUCCESS;
+	free(cursor);
+
+	return EXECUTE_SUCCESS; 
 }
 
 ExecuteResult execute_select(Statement *st, Table *table) {
 	Row r;
+	Cursor* cursor = cursor_table_start(table);
 
-	for (uint32_t i = 0; i < table->num_rows; i++) {
-		deserialize_row(row_slot(table, i), &r);
+	while(!cursor->end_of_table) {
+		deserialize_row(row_slot(cursor), &r);
+		advance_cursor(cursor);
 		print_row(r);
 	}
+
+	free(cursor);
 
 	return EXECUTE_SUCCESS;
 }
