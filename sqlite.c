@@ -107,10 +107,30 @@ const uint32_t LEAF_NODE_HEADER_SIZE = COMMON_NODE_HEADER_SIZE + LEAF_NODE_NUM_C
 const uint32_t LEAF_NODE_KEY_SIZE = sizeof(uint32_t);
 const uint32_t LEAF_NODE_KEY_OFFSET = 0;
 const uint32_t LEAF_NODE_VALUE_SIZE = ROW_SIZE; // 293
-const uint32_t LEAF_NODE_VALUE_OFFSET = LEAF_NODE_KEY_SIZE + LEAF_NODE_VALUE_SIZE;
+const uint32_t LEAF_NODE_VALUE_OFFSET = LEAF_NODE_KEY_OFFSET + LEAF_NODE_KEY_SIZE;
 const uint32_t LEAF_NODE_CELL_SIZE = LEAF_NODE_KEY_SIZE + LEAF_NODE_VALUE_SIZE;
 const uint32_t LEAF_NODE_SPACE_FOR_CELLS = PAGE_SIZE - LEAF_NODE_HEADER_SIZE;
 const uint32_t LEAF_NODE_MAX_CELLS = LEAF_NODE_SPACE_FOR_CELLS / LEAF_NODE_CELL_SIZE;
+
+uint32_t* leaf_node_cells(uint32_t* node) { 
+	return node + LEAF_NODE_NUM_CELLS_OFFSET; 
+}
+
+uint32_t* leaf_node_num_cell(uint32_t* node, uint32_t cell_num) {
+	return node + LEAF_NODE_HEADER_SIZE + (LEAF_NODE_CELL_SIZE * cell_num);
+}
+
+uint32_t* leaf_node_key(uint32_t* node, uint32_t cell_num) {
+	return node + leaf_node_num_cell(node, cell_num);
+}
+
+uint32_t* leaf_node_value(uint32_t* node, uint32_t cell_num) {
+	return node + leaf_node_num_cell(node, cell_num) + LEAF_NODE_KEY_SIZE;
+}
+
+void initialize_leaf_node(void* node) {
+	*leaf_node_num_cells(node) = 0;
+}
 
 typedef struct {
   char* buffer;
