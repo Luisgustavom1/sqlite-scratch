@@ -75,6 +75,43 @@ typedef struct {
 	Row row_to_insert;
 } Statement;
 
+typedef enum{
+	// each node is one page
+	NODE_INTERNAL,
+	NODE_LEAF,
+} NodeType;
+
+// Common node header layout
+const uint32_t NODE_TYPE_SIZE = sizeof(uint8_t);
+const uint32_t NODE_TYPE_OFFSET = 0;
+const uint32_t IS_ROOT_SIZE = sizeof(uint8_t);
+const uint32_t IS_ROOT_OFFSET = NODE_TYPE_SIZE;
+const uint32_t PARENT_POINTER_SIZE = sizeof(uint32_t);
+const uint32_t PARENT_POINTER_OFFSET = IS_ROOT_OFFSET + IS_ROOT_SIZE;
+const uint8_t COMMON_NODE_HEADER_SIZE = NODE_TYPE_SIZE + IS_ROOT_SIZE + PARENT_POINTER_SIZE;
+
+// Leaf node header mem format
+//     byte 0      byte 1 - bool      byte 2-5             byte 6-9 
+// NODE_TYPE_SIZE  IS_ROOT_SIZE  PARENT_POINTER_SIZE  LEAF_NODE_NUM_CELLS
+
+// Leaft node body mem format
+//    byte 10-13               byte 14-306            byte 307-310           byte 311-603
+// LEAF_NODE_KEY(key 1)  LEAF_NODE_VALUE(byte 1)  LEAF_NODE_KEY(key 2)  LEAF_NODE_VALUE(value 2)
+
+// Leaf node header layout
+const uint32_t LEAF_NODE_NUM_CELLS_SIZE = sizeof(uint32_t);
+const uint32_t LEAF_NODE_NUM_CELLS_OFFSET = COMMON_NODE_HEADER_SIZE;
+const uint32_t LEAF_NODE_HEADER_SIZE = COMMON_NODE_HEADER_SIZE + LEAF_NODE_NUM_CELLS_SIZE;
+
+// Leaf node body layout
+const uint32_t LEAF_NODE_KEY_SIZE = sizeof(uint32_t);
+const uint32_t LEAF_NODE_KEY_OFFSET = 0;
+const uint32_t LEAF_NODE_VALUE_SIZE = ROW_SIZE; // 293
+const uint32_t LEAF_NODE_VALUE_OFFSET = LEAF_NODE_KEY_SIZE + LEAF_NODE_VALUE_SIZE;
+const uint32_t LEAF_NODE_CELL_SIZE = LEAF_NODE_KEY_SIZE + LEAF_NODE_VALUE_SIZE;
+const uint32_t LEAF_NODE_SPACE_FOR_CELLS = PAGE_SIZE - LEAF_NODE_HEADER_SIZE;
+const uint32_t LEAF_NODE_MAX_CELLS = LEAF_NODE_SPACE_FOR_CELLS / LEAF_NODE_CELL_SIZE;
+
 typedef struct {
   char* buffer;
   size_t buffer_length;
