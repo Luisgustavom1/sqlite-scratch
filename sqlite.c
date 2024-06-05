@@ -45,7 +45,7 @@ typedef struct {
 	uint32_t page_num;
 	uint32_t cell_num;
 	bool end_of_table;
-} Cursor;
+} Cursor; 
 
 typedef enum {
 	META_COMMAND_SUCCESS,
@@ -67,6 +67,7 @@ typedef enum {
 
 typedef enum {
 	EXECUTE_SUCCESS,
+	EXECUTE_DUPLICATED_KEY,
 	EXECUTE_TABLE_FULL
 } ExecuteResult;
 
@@ -128,7 +129,17 @@ uint32_t* leaf_node_value(uint32_t* node, uint32_t cell_num) {
 	return leaf_node_cell(node, cell_num) + LEAF_NODE_KEY_SIZE;
 }
 
+NodeType get_node_type(uint32_t* node) {
+	uint8_t value = *((uint8_t*)node + NODE_TYPE_OFFSET);
+	return (NodeType)value;
+}
+
+void set_node_type(uint32_t* node, NodeType type) {
+	*((uint8_t*)node + NODE_TYPE_OFFSET) = type;
+}
+
 void initialize_leaf_node(void* node) {
+	set_node_type(node, NODE_LEAF);
 	*leaf_node_num_cells(node) = 0;
 }
 
@@ -213,6 +224,25 @@ Pager* pager_open(const char* filename) {
 	return pager;
 }
 
+void pager_flush(Pager* pager, uint32_t page_num) {
+	if (pager->pages[page_num] == NULL) {
+		printf("trying to flush null page\n");
+		exit(EXIT_FAILURE);
+	}
+
+	off_t page_offset = lseek(pager->file_descriptor, page_num * PAGE_SIZE, SEEK_SET);
+	if (page_offset == -1) {
+		printf("error seeking %d\n", errno);
+		exit(EXIT_FAILURE);
+	}
+
+        ssize_t res = write(pager->file_descriptor, pager->pages[page_num], PAGE_SIZE);
+	if (res == -1) {
+		printf("error: %d::when try to flush page %d", errno, page_num);
+		exit(EXIT_FAILURE);
+	}
+}
+
 void* get_page(Pager* pager, uint32_t page_num) {
 	if (page_num > TABLE_MAX_PAGES) {
 		printf("tried to fetch page number out of bounds. %d > %d", page_num, TABLE_MAX_PAGES);
@@ -266,24 +296,52 @@ void leaf_node_insert(Cursor* cursor, uint32_t key, Row* value) {
 	serialize_row(value, leaf_node_value(node, cursor->cell_num));
 }
 
-void pager_flush(Pager* pager, uint32_t page_num) {
-	if (pager->pages[page_num] == NULL) {
-		printf("trying to flush null page\n");
-		exit(EXIT_FAILURE);
+Cursor* leaf_node_find(Table* table, uint32_t page_num, uint32_t key) {
+	void* node = get_page(table->pager, page_num);
+	uint32_t num_cells = *leaf_node_num_cells(node);
+	
+	Cursor* cursor = malloc(sizeof(Cursor));
+	cursor->table = table;
+	cursor->page_num = page_num;
+
+	uint32_t start = 0;
+	uint32_t end = num_cells;
+
+	while (start != end) {
+		uint32_t index = (start + end) / 2;
+		uint32_t key_at_index = *leaf_node_key(node, index);
+
+		if (key == key_at_index) {
+			cursor->cell_num = index;
+			return cursor;
+		}
+
+		if (key > key_at_index) {
+			start = index + 1;
+		} else {
+			end = index;
+		}
 	}
 
-	off_t page_offset = lseek(pager->file_descriptor, page_num * PAGE_SIZE, SEEK_SET);
-	if (page_offset == -1) {
-		printf("error seeking %d\n", errno);
-		exit(EXIT_FAILURE);
-	}
-
-        ssize_t res = write(pager->file_descriptor, pager->pages[page_num], PAGE_SIZE);
-	if (res == -1) {
-		printf("error: %d::when try to flush page %d", errno, page_num);
-		exit(EXIT_FAILURE);
-	}
+	cursor->cell_num = start;
+	return cursor;
 }
+
+/* 
+ * Return the position of the give key
+ * If the key is not present, return the position where it should be inserted
+*/
+Cursor* table_find_by_key(Table* table, uint32_t key) {
+	uint32_t root_page_num = table->root_page_num;
+	void* root_node = get_page(table->pager, root_page_num);
+	
+	if (get_node_type(root_node) == NODE_LEAF) {
+		return leaf_node_find(table, root_page_num, key);
+	} 
+
+	printf("Need to implement searching an internal node\n");
+	exit(EXIT_FAILURE);
+} 
 
 void* cursor_value(Cursor* cursor) {
 	void* page = get_page(cursor->table->pager, cursor->page_num);
@@ -303,19 +361,6 @@ Cursor* cursor_table_start(Table* table) {
 	void* root_node = get_page(table->pager, cursor->page_num);
 	uint32_t num_cells = *leaf_node_num_cells(root_node);
 	cursor->end_of_table = num_cells == 0;
-	
-	return cursor;
-}
-
-Cursor* cursor_table_end(Table* table) {
-	Cursor* cursor = malloc(sizeof(Table));
-	cursor->table = table;
-	cursor->page_num = table->root_page_num;
-	
-	void* root_node = get_page(table->pager, cursor->page_num);
-	uint32_t num_cells = *leaf_node_num_cells(root_node);
-	cursor->cell_num = num_cells;
-	cursor->end_of_table = true;
 	
 	return cursor;
 }
@@ -450,12 +495,21 @@ PrepareResult prepare_statement(InputBuffer *ib, Statement *statement) {
 
 ExecuteResult execute_insert(Statement *st, Table *table) {
 	void* node = get_page(table->pager, table->root_page_num);
-	if (*(leaf_node_num_cells(node)) >= LEAF_NODE_MAX_CELLS) {
+	uint32_t num_cells = *leaf_node_num_cells(node);
+	if (num_cells >= LEAF_NODE_MAX_CELLS) {
 		return EXECUTE_TABLE_FULL;
 	}
 	
-	Cursor* cursor = cursor_table_end(table);
 	Row* r = &(st->row_to_insert);
+	uint32_t key_to_insert = r->id;
+	Cursor* cursor = table_find_by_key(table, key_to_insert);
+	
+	if (cursor->cell_num < num_cells) {
+		uint32_t key_at_index = *leaf_node_key(node, cursor->cell_num);
+		if (key_at_index == key_to_insert) {
+			return EXECUTE_DUPLICATED_KEY;
+		}
+	}
 
 	leaf_node_insert(cursor, r->id, r);
 
@@ -535,6 +589,9 @@ int main(int argc, char *argv[]) {
 		switch (execute_statement(&statement, table)) {
 			case (EXECUTE_SUCCESS):
 				printf("executed\n");
+				break;
+			case (EXECUTE_DUPLICATED_KEY):
+				printf("Error: duplicate key\n");
 				break;
 			case (EXECUTE_TABLE_FULL):
 				printf("Error: table is full\n");
