@@ -133,7 +133,7 @@ describe 'database' do
     result = run_script(script)
 
     expect(result).to match_array([
-      "db > [CONSTANTS]",
+      "db > Constants ->",
       "ROW_SIZE: 293",
       "COMMON_NODE_HEADER_SIZE: 6",
       "LEAF_NODE_HEADER_SIZE: 10",
@@ -141,6 +141,28 @@ describe 'database' do
       "LEAF_NODE_SPACE_FOR_CELLS: 4086",
       "LEAF_NODE_MAX_CELLS: 13",
       "db > ",
+    ])
+  end
+
+  it 'print out the structure of a one-node betree' do
+    commands = [3, 1, 2].map do |i|
+      "insert #{i} user#{i} person#{i}@example.com"
+    end
+    commands << ".btree"
+    commands << ".exit"
+
+    result = run_script(commands);
+
+    expect(result).to match_array([
+      "db > executed",
+      "db > executed",
+      "db > executed",
+      "db > Btree ->",
+      "leaf (size 3)",
+      " - 0 : 3",
+      " - 1 : 1",
+      " - 2 : 2",
+      "db > "
     ])
   end
 end

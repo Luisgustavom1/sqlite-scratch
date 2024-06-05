@@ -132,6 +132,16 @@ void initialize_leaf_node(void* node) {
 	*leaf_node_num_cells(node) = 0;
 }
 
+void print_leaf_node(void* node) {
+	uint32_t num_cells = *leaf_node_num_cells(node);
+	printf("leaf (size %d)\n", num_cells);
+
+	for (uint32_t i = 0; i < num_cells; i++) {
+		uint32_t key = *leaf_node_key(node, i);
+		printf(" - %d : %d\n", i, key);
+	}
+}
+
 void print_constants() {
 	printf("ROW_SIZE: %d\n", ROW_SIZE);
 	printf("COMMON_NODE_HEADER_SIZE: %d\n", COMMON_NODE_HEADER_SIZE);
@@ -385,8 +395,12 @@ MetaCommandResult do_meta_command(InputBuffer *ib, Table *table) {
 		close_db(table);
 		exit(EXIT_SUCCESS);
 	} else if (strcmp(ib->buffer, ".constants") == 0) {
-		printf("[CONSTANTS]\n");
+		printf("Constants ->\n");
 		print_constants();
+		return META_COMMAND_SUCCESS;
+	} else if (strcmp(ib->buffer, ".btree") == 0) {
+		printf("Btree ->\n");
+		print_leaf_node(get_page(table->pager, 0));
 		return META_COMMAND_SUCCESS;
 	}
 
