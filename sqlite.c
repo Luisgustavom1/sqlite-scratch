@@ -132,6 +132,15 @@ void initialize_leaf_node(void* node) {
 	*leaf_node_num_cells(node) = 0;
 }
 
+void print_constants() {
+	printf("ROW_SIZE: %d\n", ROW_SIZE);
+	printf("COMMON_NODE_HEADER_SIZE: %d\n", COMMON_NODE_HEADER_SIZE);
+  	printf("LEAF_NODE_HEADER_SIZE: %d\n", LEAF_NODE_HEADER_SIZE);
+  	printf("LEAF_NODE_CELL_SIZE: %d\n", LEAF_NODE_CELL_SIZE);
+  	printf("LEAF_NODE_SPACE_FOR_CELLS: %d\n", LEAF_NODE_SPACE_FOR_CELLS);
+  	printf("LEAF_NODE_MAX_CELLS: %d\n", LEAF_NODE_MAX_CELLS);
+}
+
 typedef struct {
   char* buffer;
   size_t buffer_length;
@@ -375,6 +384,9 @@ MetaCommandResult do_meta_command(InputBuffer *ib, Table *table) {
 		close_input_buffer(ib);
 		close_db(table);
 		exit(EXIT_SUCCESS);
+	} else if (strcmp(ib->buffer, ".constants") == 0) {
+		printf("[CONSTANTS]\n");
+		print_constants();
 		return META_COMMAND_SUCCESS;
 	}
 
