@@ -174,9 +174,9 @@ describe 'database' do
     commands << "insert 15 user15 person15@example.com"
     commands << ".exit"
     
-    run_script(commands);
+    result = run_script(commands)
 
-    expect(result[14..(result.length)]).to match_array([
+    expect(result[14...(result.length)]).to match_array([
       "db > Btree ->",
       "- internal (size 1)",
       "  - leaf (size 7)",
