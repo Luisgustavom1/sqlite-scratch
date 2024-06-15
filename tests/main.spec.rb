@@ -135,7 +135,7 @@ describe 'database' do
     ])
   end
 
-  it 'print out the structure of a one-node betree' do
+  it 'print out the structure of a one-node btree' do
     commands = [3, 1, 2].map do |i|
       "insert #{i} user#{i} person#{i}@example.com"
     end
@@ -170,23 +170,23 @@ describe 'database' do
     expect(result[14...(result.length)]).to match_array([
       "db > Btree ->",
       "- internal (size 1)",
-      "  - leaf (size 7)",
-      "      - 1",
-      "      - 2",
-      "      - 3",
-      "      - 4",
-      "      - 5",
-      "      - 6",
-      "      - 7",
-      "  - key 7",
-      "  - leaf (size 7)",
-      "    - 8",
-      "    - 9",
-      "    - 10",
-      "    - 11",
-      "    - 12",
-      "    - 13",
-      "    - 14",
+      " - leaf (size 7)",
+      "  - 1",
+      "  - 2",
+      "  - 3",
+      "  - 4",
+      "  - 5",
+      "  - 6",
+      "  - 7",
+      " - key 7",
+      " - leaf (size 7)",
+      "  - 8",
+      "  - 9",
+      "  - 10",
+      "  - 11",
+      "  - 12",
+      "  - 13",
+      "  - 14",
       "db > Need to implement searching an internal node",
     ])
   end

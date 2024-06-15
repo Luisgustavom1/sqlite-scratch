@@ -75,7 +75,7 @@ typedef struct {
 	Row row_to_insert;
 } Statement;
 
-typedef enum{
+typedef enum {
 	// each node is one page
 	NODE_INTERNAL,
 	NODE_LEAF,
@@ -114,28 +114,28 @@ const uint32_t LEAF_NODE_LEFT_SPLIT_COUNT = (LEAF_NODE_MAX_CELLS + 1) - LEAF_NOD
 //    byte 10-13               byte 14-306            byte 307-310           byte 311-603
 // LEAF_NODE_KEY(key 1)  LEAF_NODE_VALUE(byte 1)  LEAF_NODE_KEY(key 2)  LEAF_NODE_VALUE(value 2)
 
-uint32_t* leaf_node_num_cells(uint32_t* node) { 
+uint32_t* leaf_node_num_cells(void* node) { 
 	return node + LEAF_NODE_NUM_CELLS_OFFSET; 
 }
 
-uint32_t* leaf_node_cell(uint32_t* node, uint32_t cell_num) {
-	return node + LEAF_NODE_HEADER_SIZE + (LEAF_NODE_CELL_SIZE * cell_num);
+void* leaf_node_cell(void* node, uint32_t cell_num) {
+  return node + LEAF_NODE_HEADER_SIZE + (LEAF_NODE_CELL_SIZE * cell_num);
 }
 
-uint32_t* leaf_node_key(uint32_t* node, uint32_t cell_num) {
+uint32_t* leaf_node_key(void* node, uint32_t cell_num) {
 	return leaf_node_cell(node, cell_num);
 }
 
-uint32_t* leaf_node_value(uint32_t* node, uint32_t cell_num) {
+void* leaf_node_value(void* node, uint32_t cell_num) {
 	return leaf_node_cell(node, cell_num) + LEAF_NODE_KEY_SIZE;
 }
 
-NodeType get_node_type(uint32_t* node) {
+NodeType get_node_type(void* node) {
 	uint8_t value = *((uint8_t*)node + NODE_TYPE_OFFSET);
 	return (NodeType)value;
 }
 
-void set_node_type(uint32_t* node, NodeType type) {
+void set_node_type(void* node, NodeType type) {
 	uint8_t value = type;
 	*((uint8_t*)node + NODE_TYPE_OFFSET) = value;
 }
@@ -309,7 +309,7 @@ void pager_flush(Pager* pager, uint32_t page_num) {
 		exit(EXIT_FAILURE);
 	}
 
-        ssize_t res = write(pager->file_descriptor, pager->pages[page_num], PAGE_SIZE);
+  ssize_t res = write(pager->file_descriptor, pager->pages[page_num], PAGE_SIZE);
 	if (res == -1) {
 		printf("error: %d::when try to flush page %d", errno, page_num);
 		exit(EXIT_FAILURE);
@@ -432,21 +432,21 @@ void leaf_node_split_and_insert(Cursor* cursor, uint32_t key, Row* value) {
 }
 
 void leaf_node_insert(Cursor* cursor, uint32_t key, Row* value) {
-	void* node = get_page(cursor->table->pager, cursor->page_num);
-	uint32_t num_cells = *leaf_node_num_cells(node);
+  void* node = get_page(cursor->table->pager, cursor->page_num);
+  uint32_t num_cells = *leaf_node_num_cells(node);
 
-	if (num_cells >= LEAF_NODE_MAX_CELLS) {
-		leaf_node_split_and_insert(cursor, key, value);
-		return;
-	}
+  if (num_cells >= LEAF_NODE_MAX_CELLS) {
+    leaf_node_split_and_insert(cursor, key, value);
+    return;
+  }
 
 	for (uint32_t i = num_cells; i > cursor->cell_num; i--) {
 		memcpy(leaf_node_cell(node, i), leaf_node_cell(node, i - 1), LEAF_NODE_CELL_SIZE);
 	}
-		
-	*(leaf_node_num_cells(node)) += 1;
-	*(leaf_node_key(node, cursor->cell_num)) = key;
-	serialize_row(value, leaf_node_value(node, cursor->cell_num));
+
+  *(leaf_node_num_cells(node)) += 1;
+  *(leaf_node_key(node, cursor->cell_num)) = key;
+  serialize_row(value, leaf_node_value(node, cursor->cell_num));
 }
 
 Cursor* leaf_node_find(Table* table, uint32_t page_num, uint32_t key) {
