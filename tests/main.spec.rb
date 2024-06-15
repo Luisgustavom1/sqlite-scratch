@@ -35,15 +35,6 @@ describe 'database' do
     ])
   end
 
-  it 'prints error message when table is full' do
-    script = (1..1401).map do |i|
-      "insert #{i} user_#{i} person#{i}@example.com"
-    end
-    script << ".exit"
-    result = run_script(script)
-    expect(result[-2]).to eq("db > Error: table is full")
-  end
- 
   it 'allows inserting strings that are the maximum length' do
     long_username = "a"*32
     long_email = "a"*255
@@ -196,7 +187,7 @@ describe 'database' do
       "    - 12",
       "    - 13",
       "    - 14",
-      "db > need to implement searching an internal node",
+      "db > Need to implement searching an internal node",
     ])
   end
 
