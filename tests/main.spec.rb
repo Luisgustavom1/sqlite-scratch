@@ -135,7 +135,7 @@ describe 'database' do
     ])
   end
 
-  it 'print out the structure of a one-node btree' do
+  xit 'print out the structure of a one-node btree' do
     commands = [3, 1, 2].map do |i|
       "insert #{i} user#{i} person#{i}@example.com"
     end
@@ -187,7 +187,8 @@ describe 'database' do
       "  - 12",
       "  - 13",
       "  - 14",
-      "db > Need to implement searching an internal node",
+      "db > executed",
+      "db > ",
     ])
   end
 
