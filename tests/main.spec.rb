@@ -202,8 +202,7 @@ describe 'database' do
     result = run_script(commands)
 
     expect(result[15...result.length]).to match_array([
-      "db > ",
-      "(1, user1, person1@example.com)",
+      "db > (1, user1, person1@example.com)",
       "(2, user2, person2@example.com)",
       "(3, user3, person3@example.com)",
       "(4, user4, person4@example.com)",
@@ -218,7 +217,7 @@ describe 'database' do
       "(13, user13, person13@example.com)",
       "(14, user14, person14@example.com)",
       "(15, user15, person15@example.com)",
-      "db > executed", 
+      "executed", 
       "db > ",
     ])
   end
