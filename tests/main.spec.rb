@@ -135,7 +135,7 @@ describe 'database' do
     ])
   end
 
-  xit 'print out the structure of a one-node btree' do
+  it 'print out the structure of a one-node btree' do
     commands = [3, 1, 2].map do |i|
       "insert #{i} user#{i} person#{i}@example.com"
     end
@@ -239,7 +239,7 @@ describe 'database' do
     ])
   end
 
-  it 'allows printing out the structure of a 4-leaf-node btree' do
+  xit 'allows printing out the structure of a 4-leaf-node btree' do
     script = [
       "insert 18 user18 person18@example.com",
       "insert 7 user7 person7@example.com",
@@ -275,6 +275,7 @@ describe 'database' do
       ".exit",
     ]
     result = run_script(script)
+    print(result.join("\n"))
     expect(result).to match_array([
       "db > Btree ->",
       "- internal (size 3)",
