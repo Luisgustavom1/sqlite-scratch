@@ -148,7 +148,7 @@ void set_node_type(void* node, NodeType type) {
 
 void set_node_root(void* node, bool is_root) {
 	uint8_t value = is_root;
-	*((uint8_t*)(node + IS_ROOT_OFFSET)) = true;
+	*((uint8_t*)(node + IS_ROOT_OFFSET)) = is_root; 
 }
 
 void initialize_leaf_node(void* node) {
@@ -441,7 +441,6 @@ void internal_node_insert(Table* table, uint32_t parent_page_num, uint32_t new_p
 	void* right_child = get_page(table->pager, right_child_num);
 	
 	if (child_max_key > get_node_max_key(right_child)) {
-		// TODO: maybe this line is redundant
 		*internal_node_child(parent, original_num_keys) = right_child_num;
 		*internal_node_key(parent, original_num_keys) = get_node_max_key(right_child);
 		*internal_node_right_child(parent) = new_page_num;

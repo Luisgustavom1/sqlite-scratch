@@ -239,7 +239,7 @@ describe 'database' do
     ])
   end
 
-  xit 'allows printing out the structure of a 4-leaf-node btree' do
+  it 'allows printing out the structure of a 4-leaf-node btree' do
     script = [
       "insert 18 user18 person18@example.com",
       "insert 7 user7 person7@example.com",
@@ -275,8 +275,7 @@ describe 'database' do
       ".exit",
     ]
     result = run_script(script)
-    print(result.join("\n"))
-    expect(result).to match_array([
+    expect(result[(script.length - 2)...result.length]).to match_array([
       "db > Btree ->",
       "- internal (size 3)",
       " - leaf (size 7)",
@@ -287,8 +286,8 @@ describe 'database' do
       "  - 5",
       "  - 6",
       "  - 7",
-      "- key 7",
-      "- leaf (size 8)",
+      " - key 7",
+      " - leaf (size 8)",
       "  - 8",
       "  - 9",
       "  - 10",
@@ -297,8 +296,8 @@ describe 'database' do
       "  - 13",
       "  - 14",
       "  - 15",
-      "- key 15",
-      "- leaf (size 7)",
+      " - key 15",
+      " - leaf (size 7)",
       "  - 16",
       "  - 17",
       "  - 18",
@@ -306,8 +305,8 @@ describe 'database' do
       "  - 20",
       "  - 21",
       "  - 22",
-      "- key 22",
-      "- leaf (size 8)",
+      " - key 22",
+      " - leaf (size 8)",
       "  - 23",
       "  - 24",
       "  - 25",
