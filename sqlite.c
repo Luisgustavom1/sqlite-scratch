@@ -116,6 +116,11 @@ const uint32_t LEAF_NODE_LEFT_SPLIT_COUNT = (LEAF_NODE_MAX_CELLS + 1) - LEAF_NOD
 //    byte 10-13               byte 14-306            byte 307-310           byte 311-603
 // LEAF_NODE_KEY(key 1)  LEAF_NODE_VALUE(byte 1)  LEAF_NODE_KEY(key 2)  LEAF_NODE_VALUE(value 2)
 
+// leaf methods
+Cursor* leaf_node_find(Table* table, uint32_t page_num, uint32_t key);
+void leaf_node_split_and_insert(Cursor* cursor, uint32_t key, Row* value);
+void leaf_node_insert(Cursor* cursor, uint32_t key, Row* value);
+
 uint32_t* leaf_node_num_cells(void* node) { 
 	return node + LEAF_NODE_NUM_CELLS_OFFSET; 
 }
@@ -180,6 +185,12 @@ const uint32_t INTERNAL_NODE_MAX_CELLS = 3;
 //       byte 14-17               byte 18-21                 byte 22-25             byte 26-29
 // INTERNAL_NODE_CHILD_SIZE  INTERNAL_NODE_KEY_SIZE  INTERNAL_NODE_CHILD_SIZE INTERNAL_NODE_KEY_SIZE  
 //       INTERNAL_NODE_CELL_SIZE (1)                        INTERNAL_NODE_CELL_SIZE (2)
+
+// internal node methods
+Cursor* internal_node_find(Table* table, uint32_t page_num, uint32_t key);
+uint32_t internal_node_find_child(void* node, uint32_t key);
+void internal_node_split_and_insert(Table *table, uint32_t parent_page_num, uint32_t child_page_num);
+void internal_node_insert(Table* table, uint32_t parent_page_num, uint32_t child_page_num);
 
 uint32_t* internal_node_num_keys(void* node) {
 	return node + INTERNAL_NODE_NUM_KEYS_OFFSET;
